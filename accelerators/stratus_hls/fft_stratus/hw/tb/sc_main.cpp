@@ -3,9 +3,17 @@
 
 #include "system.hpp"
 
+#include "../../../../../tools/esp-noxim/src/NoC.h"
+#include "../../../../../tools/esp-noxim/src/ConfigurationManager.h"
+#include "../../../../../tools/esp-noxim/src/GlobalStats.h"
+#include "../../../../../tools/esp-noxim/src/GlobalParams.h"
+
 #define RESET_PERIOD (30 * CLOCK_PERIOD)
 
 system_t * testbench = NULL;
+
+unsigned int drained_volume;
+NoC *noc;
 
 extern void esc_elaborate()
 {
@@ -30,19 +38,41 @@ int sc_main(int argc, char *argv[])
 
 	sc_clock        clk("clk", CLOCK_PERIOD, SC_PS);
 	sc_signal<bool> rst("rst");
+	sc_signal<bool> pos_rst("pos_rst");
 
 	testbench->clk(clk);
 	testbench->rst(rst);
-	rst.write(false);
 
-	sc_start(RESET_PERIOD, SC_PS);
+	configure(argc, argv);
+	noc = new NoC("NoC");
+	noc->clock(clk);
+	noc->reset(pos_rst);
+	testbench->noc = noc;
+
+	// sc_start(RESET_PERIOD, SC_PS);
+
+	rst.write(false);
+	pos_rst.write(true);
+	cout << "Reset for " << (int)(GlobalParams::reset_time) << " cycles... ";
+    srand(GlobalParams::rnd_generator_seed);
+    sc_start(GlobalParams::reset_time, SC_NS);
 
 	rst.write(true);
+	pos_rst.write(false);
+    cout << " done! " << endl;
+    // cout << " Now running for " << GlobalParams::simulation_time << " cycles..." << endl;
+    // sc_start(GlobalParams::simulation_time, SC_NS);
 
 	sc_start();
 
-	esc_log_pass();
-        esc_cleanup();
+    cout << "Noxim simulation completed.";
+    cout << " (" << sc_time_stamp().to_double() / GlobalParams::clock_period_ps << " cycles executed)" << endl;
+    cout << endl;
+
+	GlobalStats gs(noc);
+    gs.showStats(std::cout, GlobalParams::detailed);
+
+    esc_cleanup();
 
 	return 0;
 }

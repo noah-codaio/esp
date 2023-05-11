@@ -12,7 +12,10 @@
 
 #include "esp_templates.hpp"
 
-const size_t MEM_SIZE = 262144 / (DMA_WIDTH/8);
+#include "../../../../../tools/esp-noxim/src/NoC.h"
+#include "../../../../../tools/esp-noxim/src/DataStructs.h"
+
+const size_t _MEM_SIZE = 262144 / (DMA_WIDTH/8);
 
 #include "core/systems/esp_system.hpp"
 
@@ -20,7 +23,7 @@ const size_t MEM_SIZE = 262144 / (DMA_WIDTH/8);
 #include "fft_wrap.h"
 #endif
 
-class system_t : public esp_system<DMA_WIDTH, MEM_SIZE>
+class system_t : public esp_system<DMA_WIDTH, _MEM_SIZE>
 {
 public:
 
@@ -34,7 +37,7 @@ public:
     // Constructor
     SC_HAS_PROCESS(system_t);
     system_t(sc_module_name name)
-        : esp_system<DMA_WIDTH, MEM_SIZE>(name)
+        : esp_system<DMA_WIDTH, _MEM_SIZE>(name)
     {
         // ACC
 #ifdef CADENCE
@@ -91,6 +94,56 @@ public:
     float *in;
     float *out;
     float *gold;
+
+    NoC *noc;
+
+    // TEST 1
+    Coord mem_tile_coords[2] = {
+        Coord(0, 0), 
+        Coord(3, 3)
+    };
+    Coord acc_mem_pairs[4][2] = {
+        {Coord(1, 1), Coord(0, 0)},
+        {Coord(2, 1), Coord(0, 0)},
+        {Coord(1, 2), Coord(3, 3)},
+        {Coord(2, 2), Coord(3, 3)}
+    };
+
+    // TEST 2
+    // Coord mem_tile_coords[2] = {
+    //     Coord(0, 0), 
+    //     Coord(3, 3)
+    // };
+    // Coord acc_mem_pairs[4][2] = {
+    //     {Coord(0, 3), Coord(0, 0)},
+    //     {Coord(1, 2), Coord(0, 0)},
+    //     {Coord(2, 1), Coord(3, 3)},
+    //     {Coord(3, 0), Coord(3, 3)}
+    // };
+
+    // TEST 3
+    // Coord mem_tile_coords[2] = {
+    //     Coord(1, 1), 
+    //     Coord(2, 2)
+    // };
+    // Coord acc_mem_pairs[4][2] = {
+    //     {Coord(0, 0), Coord(1, 1)},
+    //     {Coord(3, 0), Coord(1, 1)},
+    //     {Coord(0, 3), Coord(2, 2)},
+    //     {Coord(3, 3), Coord(2, 2)}
+    // };
+
+    // TEST 4
+    // Coord mem_tile_coords[2] = {
+    //     Coord(1, 1), 
+    //     Coord(2, 2)
+    // };
+    // Coord acc_mem_pairs[4][2] = {
+    //     {Coord(0, 1), Coord(1, 1)},
+    //     {Coord(2, 1), Coord(1, 1)},
+    //     {Coord(1, 2), Coord(2, 2)},
+    //     {Coord(3, 2), Coord(2, 2)}
+    // };
 
     // Other Functions
 };

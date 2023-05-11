@@ -5,6 +5,9 @@
 #include <sstream>
 #include "system.hpp"
 
+#include "../../../../../tools/esp-noxim/src/DataStructs.h"
+#include "../../../../../tools/esp-noxim/src/Utils.h"
+
 // Helper random generator
 static std::uniform_real_distribution<float> *dis;
 static std::random_device rd;
@@ -91,6 +94,18 @@ void system_t::config_proc()
 
     // Conclude
     {
+        bool data_stable = false;
+        while (!data_stable) {
+            wait();
+            data_stable = true;
+            for (Coord mem_coord : mem_tile_coords)
+                if (noc->t[mem_coord.x][mem_coord.y]->pe->local_memory.size() < in_size + out_size)
+                    data_stable = false;
+        }
+        std::cout << "in size: " << in_size << std::endl;
+        std::cout << "out size: " << out_size << std::endl;
+        std::cout << "0 size: " << noc->t[0][0]->pe->local_memory.size() << std::endl;
+        std::cout << "5 size: " << noc->t[1][1]->pe->local_memory.size() << std::endl;
         sc_stop();
     }
 }
@@ -153,6 +168,15 @@ void system_t::load_memory()
     }
 #endif
 
+    // Initialize memory tiles and place read requests from accelerator tiles
+    for (Coord mem_coord : mem_tile_coords)
+        for (int i = 0; i < in_size; i++) {
+            int data_int = (int) in[i];
+            noc->t[mem_coord.x][mem_coord.y]->pe->pushDataToLocalMemory(i, 1, &data_int);
+        }
+    for (Coord *acc_mem_pair : acc_mem_pairs)
+        noc->t[acc_mem_pair[0].x][acc_mem_pair[0].y]->pe->pushReadRequest(coord2Id(acc_mem_pair[1]), 0, in_size);
+
     ESP_REPORT_INFO("load memory completed");
 }
 
@@ -181,6 +205,15 @@ void system_t::dump_memory()
             out[i * DMA_WORD_PER_BEAT + j] = (float) out_fx;
         }
 #endif
+    
+    // Save output data to accelerator tiles and place write requests to memory tiles
+    for (Coord *acc_mem_pair : acc_mem_pairs) {
+        for (int i = 0; i < out_size; i++) {
+            int data_int = (int) out[i];
+            noc->t[acc_mem_pair[0].x][acc_mem_pair[0].y]->pe->pushDataToLocalMemory(in_size + i, 1, &data_int);
+        }
+        noc->t[acc_mem_pair[0].x][acc_mem_pair[0].y]->pe->pushWriteRequest(coord2Id(acc_mem_pair[1]), in_size, out_size);
+    }
 
     ESP_REPORT_INFO("dump memory completed");
 }
@@ -193,7 +226,7 @@ int system_t::validate()
     const float ERR_TH = 0.05;
 
     for (int j = 0; j < batch_size * 2 * len; j++) {
-        std::cout << j << " : " << gold[j] << " : " << out[j] << std::endl;
+        // std::cout << j << " : " << gold[j] << " : " << out[j] << std::endl;
         if ((fabs(gold[j] - out[j]) / fabs(gold[j])) > ERR_TH) {
             errors++;
         }
